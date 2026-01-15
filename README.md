@@ -1,7 +1,7 @@
 # LabKey Local Bootstrap (Ansible)
 
-This README documents how to run the LabKey repo bootstrap playbook (clone-labkey-repos.yml).
-It does NOT describe the SSH-only playbook.
+This README documents how to run the LabKey repo bootstrap playbook (labkey-bootstrap.yml).
+
 
 #######################################################################
 ## What This Playbook Does
