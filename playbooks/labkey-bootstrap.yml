@@ -1,6 +1,6 @@
-# playbooks/clone-labkey-repos.yml
+# playbooks/clone-labkey-repos.yml 
 ---
-- name: Configure local user environment
+- name: Clone LabKey repos and configure Java/Gradle
   hosts: nixos
   become: false
   gather_facts: false
@@ -14,45 +14,13 @@
     server_path: "{{ base_repo_path }}/server"
     modules_path: "{{ server_path }}/modules"
 
-    # dependencies live under root_dir (not inside the base repo)
     deps_path: "{{ root_dir }}/dependencies"
 
-    # pinned java artifact names/paths
     java_archive_name: "OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz"
     java_archive_path: "{{ deps_path }}/{{ java_archive_name }}"
     java_extract_path: "{{ deps_path }}/temurin{{ java_major_version }}-{{ java_version_full | replace('+','_') }}"
 
   tasks:
-  - name: Ensure ~/.ssh exists
-    file:
-      path: "{{ lookup('env','HOME') }}/.ssh"
-      state: directory
-      mode: "0700"
-
-  - name: Install private SSH key
-    copy:
-      src: "{{ ssh_key_private_src }}"
-      dest: "{{ ssh_key_private_dest }}"
-      mode: "0600"
-
-  - name: Install public SSH key
-    copy:
-      src: "{{ ssh_key_public_src }}"
-      dest: "{{ ssh_key_public_dest }}"
-      mode: "0644"
-
-  - name: Auto-start ssh-agent and load labkey key
-    blockinfile:
-      path: "{{ lookup('env','HOME') }}/.bashrc"
-      create: true
-      marker: "# {mark} ANSIBLE MANAGED BLOCK: ssh-agent"
-      block: |
-        # Start ssh-agent if not running and add labkey key
-        if [ -z "$SSH_AUTH_SOCK" ]; then
-          eval "$(ssh-agent -s)" >/dev/null
-          ssh-add "$HOME/.ssh/labkey" >/dev/null 2>&1
-        fi
-
   - name: Ensure root workspace exists
     file:
       path: "{{ root_dir }}"
@@ -116,7 +84,6 @@
         msg: {{ item.msg | default('') }}
     loop: "{{ module_git.results | default([]) }}"
 
-  # build a list of repo directories (loop-built)
   - name: Initialize repo_dirs with base repo
     set_fact:
       repo_dirs:
@@ -152,7 +119,6 @@
         {{ item.stderr | default('') }}
     loop: "{{ checkout_out.results | default([]) }}"
 
-  # java dependencies under root_dir/dependencies
   - name: Ensure <root_dir>/dependencies exists
     file:
       path: "{{ deps_path }}"
@@ -194,7 +160,6 @@
     debug:
       var: java_unarchive
 
-  # Gradle global configuration
   - name: Ensure ~/.gradle directory exists
     file:
       path: "{{ lookup('env','HOME') }}/.gradle"
@@ -216,7 +181,6 @@
         artifactory_password={{ artifactory_password }}
       create: true
 
-  # JAVA_HOME and PATH configuration
   - name: Add JAVA_HOME and PATH entries to ~/.bashrc
     blockinfile:
       path: "{{ lookup('env','HOME') }}/.bashrc"

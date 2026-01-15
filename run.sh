@@ -1,1 +1,1 @@
-ansible-playbook playbooks/labkey-bootstrap.yml --ask-vault-pass
+ansible-playbook playbooks/labkey-bootstrap.yml
