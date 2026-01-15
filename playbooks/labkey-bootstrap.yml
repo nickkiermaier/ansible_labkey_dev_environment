@@ -1,0 +1,182 @@
+# playbooks/clone-labkey-repos.yml
+---
+- name: Configure local user environment
+  hosts: nixos
+  become: false
+  gather_facts: false
+
+  vars_files:
+  - ../group_vars/all.yml
+  - ../group_vars/secrets.yml
+
+  vars:
+    base_repo_path: "{{ root_dir }}/{{ base_repo_name }}"
+    server_path: "{{ base_repo_path }}/server"
+    modules_path: "{{ server_path }}/modules"
+
+    # dependencies live under root_dir (not inside the base repo)
+    deps_path: "{{ root_dir }}/dependencies"
+
+    # pinned java artifact names/paths
+    java_archive_name: "OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz"
+    java_archive_path: "{{ deps_path }}/{{ java_archive_name }}"
+    java_extract_path: "{{ deps_path }}/temurin{{ java_major_version }}-{{ java_version_full | replace('+','_') }}"
+
+  tasks:
+  - name: Ensure ~/.ssh exists
+    file:
+      path: "{{ lookup('env','HOME') }}/.ssh"
+      state: directory
+      mode: "0700"
+
+  - name: Install private SSH key
+    copy:
+      src: "{{ ssh_key_private_src }}"
+      dest: "{{ ssh_key_private_dest }}"
+      mode: "0600"
+
+  - name: Install public SSH key
+    copy:
+      src: "{{ ssh_key_public_src }}"
+      dest: "{{ ssh_key_public_dest }}"
+      mode: "0644"
+
+  - name: Auto-start ssh-agent and load labkey key
+    blockinfile:
+      path: "{{ lookup('env','HOME') }}/.bashrc"
+      create: true
+      marker: "# {mark} ANSIBLE MANAGED BLOCK: ssh-agent"
+      block: |
+        # Start ssh-agent if not running and add labkey key
+        if [ -z "$SSH_AUTH_SOCK" ]; then
+          eval "$(ssh-agent -s)" >/dev/null
+          ssh-add "$HOME/.ssh/labkey" >/dev/null 2>&1
+        fi
+
+  - name: Ensure root workspace exists
+    file:
+      path: "{{ root_dir }}"
+      state: directory
+      mode: "0755"
+
+  - name: Clone base repo at git_version
+    git:
+      repo: "{{ base_repo_url }}"
+      dest: "{{ base_repo_path }}"
+      version: "{{ git_version }}"
+      update: true
+      accept_hostkey: true
+
+  - name: Ensure server and modules directories exist
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: "0755"
+    loop:
+    - "{{ server_path }}"
+    - "{{ modules_path }}"
+
+  - name: Clone server repos into server/ at git_version
+    git:
+      repo: "{{ item }}"
+      dest: "{{ server_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+      version: "{{ git_version }}"
+      update: true
+      accept_hostkey: true
+    loop: "{{ server_repos }}"
+
+  - name: Clone module repos into server/modules/ at git_version
+    git:
+      repo: "{{ item }}"
+      dest: "{{ modules_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+      version: "{{ git_version }}"
+      update: true
+      accept_hostkey: true
+    loop: "{{ module_repos }}"
+
+  # build a list of repo directories (loop-built, no regex backrefs)
+  - name: Initialize repo_dirs with base repo
+    set_fact:
+      repo_dirs:
+      - "{{ base_repo_path }}"
+
+  - name: Add server repo dirs
+    set_fact:
+      repo_dirs: "{{ repo_dirs + [ server_path ~ '/' ~ (item | basename | regex_replace('\\.git$','')) ] }}"
+    loop: "{{ server_repos }}"
+
+  - name: Add module repo dirs
+    set_fact:
+      repo_dirs: "{{ repo_dirs + [ modules_path ~ '/' ~ (item | basename | regex_replace('\\.git$','')) ] }}"
+    loop: "{{ module_repos }}"
+
+  - name: Checkout git_version in every repo directory
+    command: git checkout "{{ git_version }}"
+    args:
+      chdir: "{{ item }}"
+    loop: "{{ repo_dirs }}"
+    changed_when: false
+
+  # java dependencies under root_dir/dependencies
+  - name: Ensure <root_dir>/dependencies exists
+    file:
+      path: "{{ deps_path }}"
+      state: directory
+      mode: "0755"
+
+  - name: Download pinned Temurin JDK tarball (java_version_full)
+    get_url:
+      url: "{{ java_temurin_url | replace(' ', '') }}"
+      dest: "{{ java_archive_path }}"
+      mode: "0644"
+      force: true
+
+  - name: Ensure Java extraction directory exists
+    file:
+      path: "{{ java_extract_path }}"
+      state: directory
+      mode: "0755"
+
+  - name: Extract JDK into <root_dir>/dependencies/<versioned-folder>
+    unarchive:
+      src: "{{ java_archive_path }}"
+      dest: "{{ java_extract_path }}"
+      remote_src: true
+      extra_opts:
+      - --strip-components=1
+
+  # Gradle global configuration
+  # Gradle global configuration
+
+  - name: Ensure ~/.gradle directory exists
+    file:
+      path: "{{ lookup('env','HOME') }}/.gradle"
+      state: directory
+      mode: "0755"
+
+  - name: Copy global gradle.properties template to ~/.gradle
+    copy:
+      src: "{{ base_repo_path }}/gradle/global_gradle.properties_template"
+      dest: "{{ lookup('env','HOME') }}/.gradle/gradle.properties"
+      mode: "0644"
+
+  - name: Inject Artifactory credentials into gradle.properties
+    blockinfile:
+      path: "{{ lookup('env','HOME') }}/.gradle/gradle.properties"
+      marker: "# {mark} ANSIBLE MANAGED BLOCK: artifactory-creds"
+      block: |
+        artifactory_user={{ artifactory_user }}
+        artifactory_password={{ artifactory_password }}
+      create: true
+
+  # JAVA_HOME and PATH configuration
+  - name: Add JAVA_HOME and PATH entries to ~/.bashrc
+    blockinfile:
+      path: "{{ lookup('env','HOME') }}/.bashrc"
+      create: true
+      marker: "# {mark} ANSIBLE MANAGED BLOCK: java-env"
+      block: |
+        # Java environment
+        export JAVA_HOME="{{ java_extract_path }}"
+        export PATH="$JAVA_HOME/bin:$PATH"
+        export PATH="{{ base_repo_path }}/build/deploy/bin:$PATH"

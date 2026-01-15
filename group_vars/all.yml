@@ -1,0 +1,45 @@
+# group_vars/all.yml
+---
+# root workspace for all repos
+root_dir: "{{ lookup('env','HOME') }}/labkey"
+
+# base repo to clone into root_dir
+base_repo_url: "https://github.com/LabKey/server.git"
+base_repo_name: "LabkeyServer"
+
+# repos to clone into <base_repo>/server/modules/
+module_repos:
+- "https://github.com/LabKey/platform.git"
+- "https://github.com/LabKey/commonAssays.git"
+- "https://github.com/LabKey/ehrModules.git"
+- "https://github.com/LabKey/LabDevKitModules.git"
+- "git@github.com:LabKey/tnprcEHRModules.git"
+
+# repos to clone into <base_repo>/server/
+server_repos:
+- "https://github.com/LabKey/testAutomation.git"
+
+# ssh key filenames (stored in this ansible repo under files/ssh/)
+ssh_key_private_src: "../files/ssh/labkey"
+ssh_key_public_src: "../files/ssh/labkey.pub"
+ssh_key_private_dest: "{{ lookup('env','HOME') }}/.ssh/labkey"
+ssh_key_public_dest: "{{ lookup('env','HOME') }}/.ssh/labkey.pub"
+
+# version to checkout everywhere (branch, tag, or commit SHA)
+git_version: "release24.11-SNAPSHOT"
+
+# java version pinned (example: 17.0.17+10)
+java_version_full: "17.0.17+10"
+
+# derived pieces (do not edit)
+java_major_version: "{{ (java_version_full.split('.')[0] | int) }}"
+java_version_tag: "{{ java_version_full | replace('+', '%2B') }}" # for GitHub release tag in URL
+java_version_filename: "{{ java_version_full | replace('+', '_') }}" # in tarball name
+
+# pinned Temurin download URL (Linux x64 HotSpot)
+java_temurin_url: >-
+  https://github.com/adoptium/temurin{{ java_major_version }}-binaries/releases/download/jdk-{{ java_version_tag }}/ OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz
+
+# Artifactory token to inject into gradle.properties
+artifactory_user: "PUT_USER_HERE"
+artifactory_password: "PUT_PASSWORD_HERE"
