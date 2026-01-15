@@ -84,6 +84,17 @@
       update: true
       accept_hostkey: true
     loop: "{{ server_repos }}"
+    register: server_git
+
+  - name: Show clone/update output (server repos)
+    debug:
+      msg: |
+        repo: {{ item.item }}
+        changed: {{ item.changed }}
+        before: {{ item.before | default('') }}
+        after: {{ item.after | default('') }}
+        msg: {{ item.msg | default('') }}
+    loop: "{{ server_git.results | default([]) }}"
 
   - name: Clone module repos into server/modules/ at git_version
     git:
@@ -93,8 +104,19 @@
       update: true
       accept_hostkey: true
     loop: "{{ module_repos }}"
+    register: module_git
 
-  # build a list of repo directories (loop-built, no regex backrefs)
+  - name: Show clone/update output (module repos)
+    debug:
+      msg: |
+        repo: {{ item.item }}
+        changed: {{ item.changed }}
+        before: {{ item.before | default('') }}
+        after: {{ item.after | default('') }}
+        msg: {{ item.msg | default('') }}
+    loop: "{{ module_git.results | default([]) }}"
+
+  # build a list of repo directories (loop-built)
   - name: Initialize repo_dirs with base repo
     set_fact:
       repo_dirs:
@@ -116,6 +138,19 @@
       chdir: "{{ item }}"
     loop: "{{ repo_dirs }}"
     changed_when: false
+    register: checkout_out
+    ignore_errors: true
+
+  - name: Show git checkout output
+    debug:
+      msg: |
+        repo_dir: {{ item.item }}
+        rc: {{ item.rc }}
+        stdout:
+        {{ item.stdout | default('') }}
+        stderr:
+        {{ item.stderr | default('') }}
+    loop: "{{ checkout_out.results | default([]) }}"
 
   # java dependencies under root_dir/dependencies
   - name: Ensure <root_dir>/dependencies exists
@@ -130,6 +165,15 @@
       dest: "{{ java_archive_path }}"
       mode: "0644"
       force: true
+    register: java_dl
+
+  - name: Show java download result
+    debug:
+      msg: |
+        url: {{ java_temurin_url | replace(' ', '') }}
+        dest: {{ java_archive_path }}
+        changed: {{ java_dl.changed }}
+        msg: {{ java_dl.msg | default('') }}
 
   - name: Ensure Java extraction directory exists
     file:
@@ -144,10 +188,13 @@
       remote_src: true
       extra_opts:
       - --strip-components=1
+    register: java_unarchive
+
+  - name: Show java extract result
+    debug:
+      var: java_unarchive
 
   # Gradle global configuration
-  # Gradle global configuration
-
   - name: Ensure ~/.gradle directory exists
     file:
       path: "{{ lookup('env','HOME') }}/.gradle"
