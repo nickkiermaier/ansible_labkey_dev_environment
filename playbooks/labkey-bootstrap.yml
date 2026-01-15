@@ -191,3 +191,38 @@
         export JAVA_HOME="{{ java_extract_path }}"
         export PATH="$JAVA_HOME/bin:$PATH"
         export PATH="{{ base_repo_path }}/build/deploy/bin:$PATH"
+  # Gradle workspace setup (IntelliJ)
+
+  - name: Run gradlew ijWorkspaceSetup
+    command: ./gradlew ijWorkspaceSetup
+    args:
+      chdir: "{{ base_repo_path }}"
+    register: gradle_workspace
+    ignore_errors: true
+
+  - name: Show ijWorkspaceSetup output
+    debug:
+      msg: |
+        command: gradlew ijWorkspaceSetup
+        rc: {{ gradle_workspace.rc }}
+        stdout:
+        {{ gradle_workspace.stdout | default('') }}
+        stderr:
+        {{ gradle_workspace.stderr | default('') }}
+
+  - name: Run gradlew ijConfigure
+    command: ./gradlew ijConfigure
+    args:
+      chdir: "{{ base_repo_path }}"
+    register: gradle_configure
+    ignore_errors: true
+
+  - name: Show ijConfigure output
+    debug:
+      msg: |
+        command: gradlew ijConfigure
+        rc: {{ gradle_configure.rc }}
+        stdout:
+        {{ gradle_configure.stdout | default('') }}
+        stderr:
+        {{ gradle_configure.stderr | default('') }}
