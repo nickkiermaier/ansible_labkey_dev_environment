@@ -71,6 +71,7 @@
       version: "{{ git_version }}"
       update: true
       accept_hostkey: true
+      key_file: "{{ git_ssh_key }}"
     loop: "{{ module_repos }}"
     register: module_git
 
@@ -226,3 +227,15 @@
         {{ gradle_configure.stdout | default('') }}
         stderr:
         {{ gradle_configure.stderr | default('') }}
+
+  - name: Ensure <deps_path>/database exists
+    file:
+      path: "{{ deps_path }}/database"
+      state: directory
+      mode: "0755"
+
+  - name: Copy docker-compose.yml from Ansible files to <deps_path>/database
+    copy:
+      src: ../files/docker-compose.yml
+      dest: "{{ deps_path }}/database/docker-compose.yml"
+      mode: "0644"

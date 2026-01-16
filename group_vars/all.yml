@@ -33,3 +33,6 @@ java_version_filename: "{{ java_version_full | replace('+', '_') }}" # in tarbal
 # pinned Temurin download URL (Linux x64 HotSpot)
 java_temurin_url: >-
   https://github.com/adoptium/temurin{{ java_major_version }}-binaries/releases/download/jdk-{{ java_version_tag }}/ OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz
+
+git_ssh_key_name: "labkey"
+git_ssh_key: "{{ lookup('env','HOME') }}/.ssh/{{ git_ssh_key_name }}"
