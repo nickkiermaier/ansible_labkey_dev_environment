@@ -60,9 +60,9 @@ sudo apt update
 sudo apt install -y ansible python3 python3-venv python3-yaml
 ```
 ### Fedora
-
+```
 sudo dnf install -y ansible python3 python3-libselinux
-
+```
 Verify:
 ```
 ansible --version
@@ -126,6 +126,7 @@ You can re-run it at any time.
 
 Verify Java:
 ```
+exec $SHELL
 java -version
 echo $JAVA_HOME
 ```
