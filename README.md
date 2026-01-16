@@ -174,14 +174,7 @@ ls -l "$HOME/labkey/dependencies"
    You generally only need to rerun this if you pull new code, change modules,
    or update deployment-related configuration.
 
-3) Tail the LabKey log
-
-   In a separate terminal, follow the server log during startup:
-```
-  tail -f /home/nick/labkey/LabkeyServer/build/deploy/embedded/logs/labkey.log
-```
-
-4) Start LabKey with developer logging enabled
+3) Start LabKey with developer logging enabled
 
    Start LabKey with Gradle info logging, stack traces, and LabKey developer mode enabled:
 ```
@@ -190,6 +183,13 @@ ls -l "$HOME/labkey/dependencies"
      --stacktrace \
      -Dlabkey.devMode=true \
      -Dlabkey.developer=true
+```
+
+4) Tail the LabKey log
+
+   In a separate terminal, follow the server log during startup:
+```
+   tail -f /home/nick/labkey/LabkeyServer/build/deploy/embedded/logs/labkey.log
 ```
 
 
