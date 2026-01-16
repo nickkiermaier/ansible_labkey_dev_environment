@@ -228,14 +228,38 @@
         stderr:
         {{ gradle_configure.stderr | default('') }}
 
-  - name: Ensure <deps_path>/database exists
-    file:
-      path: "{{ deps_path }}/database"
-      state: directory
-      mode: "0755"
+  - name: Update jdbcUser in mssql.properties
+    lineinfile:
+      path: "{{ base_repo_path }}/server/configs/mssql.properties"
+      regexp: '^jdbcUser='
+      line: "jdbcUser={{ labkey_db_user }}"
+      backrefs: false
+      mode: "0600"
 
-  - name: Copy docker-compose.yml from Ansible files to <deps_path>/database
-    copy:
-      src: ../files/docker-compose.yml
-      dest: "{{ deps_path }}/database/docker-compose.yml"
-      mode: "0644"
+  - name: Update jdbcPassword in mssql.properties
+    lineinfile:
+      path: "{{ base_repo_path }}/server/configs/mssql.properties"
+      regexp: '^jdbcPassword='
+      line: "jdbcPassword={{ labkey_db_password }}"
+      backrefs: false
+      mode: "0600"
+
+  - name: Run gradlew pickMSSQL
+    command: ./gradlew pickMSSQL
+    args:
+      chdir: "{{ base_repo_path }}"
+    environment:
+      JAVA_HOME: "{{ java_extract_path }}"
+      PATH: "{{ java_extract_path }}/bin:{{ ansible_env.PATH }}"
+    register: pick_mssql
+    ignore_errors: false
+
+  - name: Show pickMSSQL output
+    debug:
+      msg: |
+        command: ./gradlew pickMSSQL
+        rc: {{ pick_mssql.rc }}
+        stdout:
+        {{ pick_mssql.stdout | default('') }}
+        stderr:
+        {{ pick_mssql.stderr | default('') }}

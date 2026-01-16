@@ -20,7 +20,7 @@ server_repos:
 - "https://github.com/LabKey/testAutomation.git"
 
 # version to checkout everywhere (branch, tag, or commit SHA)
-git_version: "release24.11-SNAPSHOT"
+git_version: "release25.7-SNAPSHOT"
 
 # java version pinned (example: 17.0.17+10)
 java_version_full: "17.0.17+10"

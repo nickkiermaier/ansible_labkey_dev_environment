@@ -1,0 +1,26 @@
+# playbooks/labkey-docker-mssql.yml
+---
+- name: Ensure database docker-compose exists under dependencies
+  hosts: nixos
+  become: false
+  gather_facts: false
+
+  vars_files:
+  - ../group_vars/all.yml
+  - ../group_vars/secrets.yml
+
+  vars:
+    deps_path: "{{ root_dir }}/dependencies"
+
+  tasks:
+  - name: Ensure <deps_path>/database exists
+    file:
+      path: "{{ deps_path }}/database"
+      state: directory
+      mode: "0755"
+
+  - name: Copy docker-compose.yml from Ansible files to <deps_path>/database
+    copy:
+      src: ../files/docker-compose.yml
+      dest: "{{ deps_path }}/database/docker-compose.yml"
+      mode: "0644"
