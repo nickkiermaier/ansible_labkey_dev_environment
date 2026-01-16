@@ -1,3 +1,6 @@
+# docker compose to spin up a local mssql database
+# define your volume to be on this machine and put your database restore file in this.
+
 version: "3.9"
 
 services:
@@ -11,5 +14,5 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "Labkey1098!"
     volumes:
-      - /home/nick-tnprc/labkey/database:/labkey
+      - /home/nick/labkey/database:/labkey
     restart: unless-stopped
