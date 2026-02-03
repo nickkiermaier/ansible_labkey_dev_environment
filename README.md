@@ -144,6 +144,7 @@ ls -l "$HOME/labkey/dependencies"
 #######################################################################
 ## Starting Labkey
 #######################################################################
+* You can pick up at the developer documentation starting with the Intellij setup.
 
 
 
