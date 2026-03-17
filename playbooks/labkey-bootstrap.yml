@@ -3,7 +3,7 @@
 - name: Clone LabKey repos and configure Java/Gradle
   hosts: nixos
   become: false
-  gather_facts: false
+  gather_facts: true
 
   vars_files:
   - ../group_vars/all.yml
