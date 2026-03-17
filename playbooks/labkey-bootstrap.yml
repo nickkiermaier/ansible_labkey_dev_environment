@@ -1,265 +1,131 @@
 # playbooks/clone-labkey-repos.yml 
 ---
 - name: Clone LabKey repos and configure Java/Gradle
-  hosts: nixos
+  hosts: localhost
+  connection: local
   become: false
   gather_facts: true
 
   vars_files:
-  - ../group_vars/all.yml
-  - ../group_vars/secrets.yml
+    - ../group_vars/all.yml
+    - ../group_vars/secrets.yml
 
   vars:
     base_repo_path: "{{ root_dir }}/{{ base_repo_name }}"
     server_path: "{{ base_repo_path }}/server"
     modules_path: "{{ server_path }}/modules"
-
     deps_path: "{{ root_dir }}/dependencies"
-
     java_archive_name: "OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz"
     java_archive_path: "{{ deps_path }}/{{ java_archive_name }}"
     java_extract_path: "{{ deps_path }}/temurin{{ java_major_version }}-{{ java_version_full | replace('+','_') }}"
 
+  # This ensures these variables are on the PATH for every task in this play
+  environment:
+    JAVA_HOME: "{{ java_extract_path }}"
+    PATH: "{{ java_extract_path }}/bin:{{ base_repo_path }}/build/deploy/bin:{{ ansible_env.PATH }}"
+
   tasks:
-  - name: Ensure root workspace exists
-    file:
-      path: "{{ root_dir }}"
-      state: directory
-      mode: "0755"
+    - name: Ensure root workspace exists
+      file:
+        path: "{{ root_dir }}"
+        state: directory
+        mode: "0755"
 
-  - name: Clone base repo at git_version
-    git:
-      repo: "{{ base_repo_url }}"
-      dest: "{{ base_repo_path }}"
-      version: "{{ git_version }}"
-      update: true
-      accept_hostkey: true
+    - name: Clone base repo at git_version
+      git:
+        repo: "{{ base_repo_url }}"
+        dest: "{{ base_repo_path }}"
+        version: "{{ git_version }}"
+        update: no
+        accept_hostkey: true
+      ignore_errors: yes
 
-  - name: Ensure server and modules directories exist
-    file:
-      path: "{{ item }}"
-      state: directory
-      mode: "0755"
-    loop:
-    - "{{ server_path }}"
-    - "{{ modules_path }}"
+    - name: Ensure server and modules directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ server_path }}"
+        - "{{ modules_path }}"
 
-  - name: Clone server repos into server/ at git_version
-    git:
-      repo: "{{ item }}"
-      dest: "{{ server_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
-      version: "{{ git_version }}"
-      update: true
-      accept_hostkey: true
-    loop: "{{ server_repos }}"
-    register: server_git
+    - name: Clone server repos into server/
+      git:
+        repo: "{{ item }}"
+        dest: "{{ server_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+        version: "{{ git_version }}"
+        update: no
+        accept_hostkey: true
+      loop: "{{ server_repos }}"
+      ignore_errors: yes
 
-  - name: Show clone/update output (server repos)
-    debug:
-      msg: |
-        repo: {{ item.item }}
-        changed: {{ item.changed }}
-        before: {{ item.before | default('') }}
-        after: {{ item.after | default('') }}
-        msg: {{ item.msg | default('') }}
-    loop: "{{ server_git.results | default([]) }}"
+    - name: Clone module repos into server/modules/
+      git:
+        repo: "{{ item }}"
+        dest: "{{ modules_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+        version: "{{ git_version }}"
+        update: no
+        accept_hostkey: true
+        key_file: "{{ git_ssh_key }}"
+      loop: "{{ module_repos }}"
 
-  - name: Clone module repos into server/modules/ at git_version
-    git:
-      repo: "{{ item }}"
-      dest: "{{ modules_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
-      version: "{{ git_version }}"
-      update: true
-      accept_hostkey: true
-      key_file: "{{ git_ssh_key }}"
-    loop: "{{ module_repos }}"
-    register: module_git
+    - name: Ensure <root_dir>/dependencies exists
+      file:
+        path: "{{ deps_path }}"
+        state: directory
+        mode: "0755"
 
-  - name: Show clone/update output (module repos)
-    debug:
-      msg: |
-        repo: {{ item.item }}
-        changed: {{ item.changed }}
-        before: {{ item.before | default('') }}
-        after: {{ item.after | default('') }}
-        msg: {{ item.msg | default('') }}
-    loop: "{{ module_git.results | default([]) }}"
+    - name: Download pinned Temurin JDK tarball
+      get_url:
+        url: "{{ java_temurin_url | replace(' ', '') }}"
+        dest: "{{ java_archive_path }}"
+        mode: "0644"
 
-  - name: Initialize repo_dirs with base repo
-    set_fact:
-      repo_dirs:
-      - "{{ base_repo_path }}"
+    - name: Extract JDK
+      unarchive:
+        src: "{{ java_archive_path }}"
+        dest: "{{ java_extract_path }}"
+        remote_src: true
+        extra_opts:
+          - --strip-components=1
 
-  - name: Add server repo dirs
-    set_fact:
-      repo_dirs: "{{ repo_dirs + [ server_path ~ '/' ~ (item | basename | regex_replace('\\.git$','')) ] }}"
-    loop: "{{ server_repos }}"
+    - name: Add JAVA_HOME and PATH entries to ~/.bashrc
+      blockinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        create: true
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: java-env"
+        block: |
+          # Java environment
+          export JAVA_HOME="{{ java_extract_path }}"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          export PATH="{{ base_repo_path }}/build/deploy/bin:$PATH"
 
-  - name: Add module repo dirs
-    set_fact:
-      repo_dirs: "{{ repo_dirs + [ modules_path ~ '/' ~ (item | basename | regex_replace('\\.git$','')) ] }}"
-    loop: "{{ module_repos }}"
+    - name: Run gradlew ijWorkspaceSetup
+      command: ./gradlew ijWorkspaceSetup
+      args:
+        chdir: "{{ base_repo_path }}"
+      register: gradle_workspace
+      ignore_errors: true
 
-  - name: Checkout git_version in every repo directory
-    command: git checkout "{{ git_version }}"
-    args:
-      chdir: "{{ item }}"
-    loop: "{{ repo_dirs }}"
-    changed_when: false
-    register: checkout_out
-    ignore_errors: true
+    - name: Run gradlew ijConfigure
+      command: ./gradlew ijConfigure
+      args:
+        chdir: "{{ base_repo_path }}"
+      register: gradle_configure
+      ignore_errors: true
 
-  - name: Show git checkout output
-    debug:
-      msg: |
-        repo_dir: {{ item.item }}
-        rc: {{ item.rc }}
-        stdout:
-        {{ item.stdout | default('') }}
-        stderr:
-        {{ item.stderr | default('') }}
-    loop: "{{ checkout_out.results | default([]) }}"
+    - name: Update mssql.properties credentials
+      lineinfile:
+        path: "{{ base_repo_path }}/server/configs/mssql.properties"
+        regexp: "{{ item.regex }}"
+        line: "{{ item.line }}"
+        mode: "0600"
+      loop:
+        - { regex: '^jdbcUser=', line: "jdbcUser={{ labkey_db_user }}" }
+        - { regex: '^jdbcPassword=', line: "jdbcPassword={{ labkey_db_password }}" }
 
-  - name: Ensure <root_dir>/dependencies exists
-    file:
-      path: "{{ deps_path }}"
-      state: directory
-      mode: "0755"
-
-  - name: Download pinned Temurin JDK tarball (java_version_full)
-    get_url:
-      url: "{{ java_temurin_url | replace(' ', '') }}"
-      dest: "{{ java_archive_path }}"
-      mode: "0644"
-      force: true
-    register: java_dl
-
-  - name: Show java download result
-    debug:
-      msg: |
-        url: {{ java_temurin_url | replace(' ', '') }}
-        dest: {{ java_archive_path }}
-        changed: {{ java_dl.changed }}
-        msg: {{ java_dl.msg | default('') }}
-
-  - name: Ensure Java extraction directory exists
-    file:
-      path: "{{ java_extract_path }}"
-      state: directory
-      mode: "0755"
-
-  - name: Extract JDK into <root_dir>/dependencies/<versioned-folder>
-    unarchive:
-      src: "{{ java_archive_path }}"
-      dest: "{{ java_extract_path }}"
-      remote_src: true
-      extra_opts:
-      - --strip-components=1
-    register: java_unarchive
-
-  - name: Show java extract result
-    debug:
-      var: java_unarchive
-
-  - name: Ensure ~/.gradle directory exists
-    file:
-      path: "{{ lookup('env','HOME') }}/.gradle"
-      state: directory
-      mode: "0755"
-
-  - name: Copy global gradle.properties template to ~/.gradle
-    copy:
-      src: "{{ base_repo_path }}/gradle/global_gradle.properties_template"
-      dest: "{{ lookup('env','HOME') }}/.gradle/gradle.properties"
-      mode: "0644"
-
-  - name: Inject Artifactory credentials into gradle.properties
-    blockinfile:
-      path: "{{ lookup('env','HOME') }}/.gradle/gradle.properties"
-      marker: "# {mark} ANSIBLE MANAGED BLOCK: artifactory-creds"
-      block: |
-        artifactory_user={{ artifactory_user }}
-        artifactory_password={{ artifactory_password }}
-      create: true
-
-  - name: Add JAVA_HOME and PATH entries to ~/.bashrc
-    blockinfile:
-      path: "{{ lookup('env','HOME') }}/.bashrc"
-      create: true
-      marker: "# {mark} ANSIBLE MANAGED BLOCK: java-env"
-      block: |
-        # Java environment
-        export JAVA_HOME="{{ java_extract_path }}"
-        export PATH="$JAVA_HOME/bin:$PATH"
-        export PATH="{{ base_repo_path }}/build/deploy/bin:$PATH"
-  # Gradle workspace setup (IntelliJ)
-
-  - name: Run gradlew ijWorkspaceSetup
-    command: ./gradlew ijWorkspaceSetup
-    args:
-      chdir: "{{ base_repo_path }}"
-    register: gradle_workspace
-    ignore_errors: true
-
-  - name: Show ijWorkspaceSetup output
-    debug:
-      msg: |
-        command: gradlew ijWorkspaceSetup
-        rc: {{ gradle_workspace.rc }}
-        stdout:
-        {{ gradle_workspace.stdout | default('') }}
-        stderr:
-        {{ gradle_workspace.stderr | default('') }}
-
-  - name: Run gradlew ijConfigure
-    command: ./gradlew ijConfigure
-    args:
-      chdir: "{{ base_repo_path }}"
-    register: gradle_configure
-    ignore_errors: true
-
-  - name: Show ijConfigure output
-    debug:
-      msg: |
-        command: gradlew ijConfigure
-        rc: {{ gradle_configure.rc }}
-        stdout:
-        {{ gradle_configure.stdout | default('') }}
-        stderr:
-        {{ gradle_configure.stderr | default('') }}
-
-  - name: Update jdbcUser in mssql.properties
-    lineinfile:
-      path: "{{ base_repo_path }}/server/configs/mssql.properties"
-      regexp: '^jdbcUser='
-      line: "jdbcUser={{ labkey_db_user }}"
-      backrefs: false
-      mode: "0600"
-
-  - name: Update jdbcPassword in mssql.properties
-    lineinfile:
-      path: "{{ base_repo_path }}/server/configs/mssql.properties"
-      regexp: '^jdbcPassword='
-      line: "jdbcPassword={{ labkey_db_password }}"
-      backrefs: false
-      mode: "0600"
-
-  - name: Run gradlew pickMSSQL
-    command: ./gradlew pickMSSQL
-    args:
-      chdir: "{{ base_repo_path }}"
-    environment:
-      JAVA_HOME: "{{ java_extract_path }}"
-      PATH: "{{ java_extract_path }}/bin:{{ ansible_env.PATH }}"
-    register: pick_mssql
-    ignore_errors: false
-
-  - name: Show pickMSSQL output
-    debug:
-      msg: |
-        command: ./gradlew pickMSSQL
-        rc: {{ pick_mssql.rc }}
-        stdout:
-        {{ pick_mssql.stdout | default('') }}
-        stderr:
-        {{ pick_mssql.stderr | default('') }}
+    - name: Run gradlew pickMSSQL
+      command: ./gradlew pickMSSQL
+      args:
+        chdir: "{{ base_repo_path }}"
+      register: pick_mssql
