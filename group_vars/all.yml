@@ -1,7 +1,7 @@
 # group_vars/all.yml
 ---
 # root workspace for all repos
-root_dir: "{{ lookup('env','HOME') }}/labkey"
+root_dir: "{{ lookup('env','HOME') }}/labkey2"
 
 # base repo to clone into root_dir
 base_repo_url: "https://github.com/LabKey/server.git"
