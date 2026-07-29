@@ -1,0 +1,28 @@
+---
+- name: Clone LabKey repos and configure Java/Gradle
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  vars:
+    # Artifactory token to inject into gradle.properties 
+    artifactory_user: "nickkiermaier"
+    artifactory_password: ""
+
+  tasks:
+  - name: Add artifactory_user to gradle.properties
+    ansible.builtin.lineinfile:
+      path: "{{ ansible_facts['env']['HOME'] }}/.gradle/gradle.properties"
+      regexp: '^artifactory_user='
+      line: 'artifactory_user={{ artifactory_user }}'
+      create: true
+      mode: '0600'
+
+  - name: Add artifactory_password to gradle.properties
+    ansible.builtin.lineinfile:
+      path: "{{ ansible_facts['env']['HOME'] }}/.gradle/gradle.properties"
+      regexp: '^artifactory_password='
+      line: 'artifactory_password={{ artifactory_password }}'
+      create: true
+      mode: '0600'

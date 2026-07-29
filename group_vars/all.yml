@@ -5,7 +5,7 @@ root_dir: "{{ lookup('env','HOME') }}/labkey"
 
 # base repo to clone into root_dir
 base_repo_url: "https://github.com/LabKey/server.git"
-base_repo_name: "LabkeyServer"
+base_repo_name: "LabkeyServer26-3"
 
 # repos to clone into <base_repo>/server/modules/
 module_repos:
@@ -20,19 +20,26 @@ server_repos:
 - "https://github.com/LabKey/testAutomation.git"
 
 # version to checkout everywhere (branch, tag, or commit SHA)
-git_version: "release25.7-SNAPSHOT"
+git_version: "release26.3-SNAPSHOT"
 
 # java version pinned (example: 17.0.17+10)
-java_version_full: "17.0.17+10"
-
-# derived pieces (do not edit)
-java_major_version: "{{ (java_version_full.split('.')[0] | int) }}"
-java_version_tag: "{{ java_version_full | replace('+', '%2B') }}" # for GitHub release tag in URL
-java_version_filename: "{{ java_version_full | replace('+', '_') }}" # in tarball name
-
-# pinned Temurin download URL (Linux x64 HotSpot)
-java_temurin_url: >-
-  https://github.com/adoptium/temurin{{ java_major_version }}-binaries/releases/download/jdk-{{ java_version_tag }}/ OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz
+java_major_version: "25"
+# The %2B is the URL-encoded version of the '+' sign required by the GitHub download link
+java_version_full: "25.0.4%2B7"
+java_version_filename: "25.0.4_7"
+java_archive_name: "OpenJDK{{ java_major_version }}U-jdk_x64_linux_hotspot_{{ java_version_filename }}.tar.gz"
+java_temurin_url: "https://github.com/adoptium/temurin{{ java_major_version }}-binaries/releases/download/jdk-{{ java_version_full }}/{{ java_archive_name }}"
+java_archive_path: "{{ deps_path }}/{{ java_archive_name }}"
+java_extract_path: "{{ deps_path }}/temurin{{ java_major_version }}-{{ java_version_full | replace('+','_') }}"
 
 git_ssh_key_name: "labkey"
 git_ssh_key: "{{ lookup('env','HOME') }}/.ssh/{{ git_ssh_key_name }}"
+
+base_repo_path: "{{ root_dir }}/{{ base_repo_name }}"
+server_path: "{{ base_repo_path }}/server"
+modules_path: "{{ server_path }}/modules"
+deps_path: "{{ root_dir }}/dependencies"
+
+# DO NOT PUT PROD CREDS HERE!! THIS IS LOCAL HOST ONLY
+labkey_db_user: "sa"
+labkey_db_password: "Labkey1098!"

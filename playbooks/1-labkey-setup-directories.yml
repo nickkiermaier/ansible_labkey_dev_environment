@@ -1,0 +1,55 @@
+# playbooks/clone-labkey-repos.yml 
+---
+- name: Clone LabKey repos
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  vars_files:
+  - ../group_vars/all.yml
+
+  tasks:
+  - name: Ensure root workspace exists
+    file:
+      path: "{{ root_dir }}"
+      state: directory
+      mode: "0755"
+
+  - name: Clone base repo at git_version
+    git:
+      repo: "{{ base_repo_url }}"
+      dest: "{{ base_repo_path }}"
+      version: "{{ git_version }}"
+      update: no
+      accept_hostkey: true
+    ignore_errors: yes
+
+  - name: Ensure server and modules directories exist
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: "0755"
+    loop:
+    - "{{ server_path }}"
+    - "{{ modules_path }}"
+
+  - name: Clone server repos into server/
+    git:
+      repo: "{{ item }}"
+      dest: "{{ server_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+      version: "{{ git_version }}"
+      update: no
+      accept_hostkey: true
+    loop: "{{ server_repos }}"
+    ignore_errors: yes
+
+  - name: Clone module repos into server/modules/
+    git:
+      repo: "{{ item }}"
+      dest: "{{ modules_path }}/{{ item | basename | regex_replace('\\.git$', '') }}"
+      version: "{{ git_version }}"
+      update: no
+      accept_hostkey: true
+      key_file: "{{ git_ssh_key }}"
+    loop: "{{ module_repos }}"

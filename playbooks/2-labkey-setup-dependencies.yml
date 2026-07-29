@@ -1,0 +1,39 @@
+# playbooks/clone-labkey-repos.yml 
+---
+- name: Clone LabKey repos and configure Java/Gradle
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  vars_files:
+  - ../group_vars/all.yml
+
+  tasks:
+  - name: Ensure root workspace exists
+    file:
+      path: "{{ root_dir }}"
+      state: directory
+
+  - name: Ensure <root_dir>/dependencies exists
+    file:
+      path: "{{ deps_path }}"
+      state: directory
+
+  - name: Download pinned Temurin JDK tarball
+    get_url:
+      url: "{{ java_temurin_url | replace(' ', '') }}"
+      dest: "{{ java_archive_path }}"
+
+  - name: Ensure JDK extraction directory exists
+    file:
+      path: "{{ java_extract_path }}"
+      state: directory
+
+  - name: Extract JDK
+    unarchive:
+      src: "{{ java_archive_path }}"
+      dest: "{{ java_extract_path }}"
+      remote_src: true
+      extra_opts:
+      - --strip-components=1

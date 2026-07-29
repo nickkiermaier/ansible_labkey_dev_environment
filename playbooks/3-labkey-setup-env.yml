@@ -1,0 +1,39 @@
+# playbooks/clone-labkey-repos.yml 
+---
+- name: Clone LabKey repos and configure Java/Gradle
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  vars_files:
+  - ../group_vars/all.yml
+  # This ensures these variables are on the PATH for every task in this play
+  environment:
+    JAVA_HOME: "{{ java_extract_path }}"
+    PATH: "{{ java_extract_path }}/bin:{{ base_repo_path }}/build/deploy/bin:{{ ansible_env.PATH }}"
+
+  tasks:
+  - name: Create .envrc file
+    ansible.builtin.copy:
+      dest: "{{ base_repo_path }}/.envrc"
+      mode: '0774'
+      content: |
+        # Java environment
+        export JAVA_HOME="{{ java_extract_path }}"
+        PATH_add "$JAVA_HOME/bin"
+        PATH_add "{{ base_repo_path }}/build/deploy/bin"
+
+  - name: Run gradlew ijWorkspaceSetup
+    command: ./gradlew ijWorkspaceSetup
+    args:
+      chdir: "{{ base_repo_path }}"
+    register: gradle_workspace
+    ignore_errors: true
+
+  - name: Run gradlew ijConfigure
+    command: ./gradlew ijConfigure
+    args:
+      chdir: "{{ base_repo_path }}"
+    register: gradle_configure
+    ignore_errors: true
