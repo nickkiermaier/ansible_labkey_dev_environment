@@ -15,4 +15,6 @@
 
 ## After 
 * You will still need to setup intellij per the Labkey developer setup docs
+* You will need to run `direnv allow` in your root labkey directory
+* After running the previous step you will need to run `./gradlew deployApp`
 * Make sure to point the java location inside of intellij to the `~/labkey/dependencies/<java-version>` directory
